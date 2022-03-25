@@ -1,0 +1,44 @@
+#!/bin/sh
+
+openssl version | grep 'OpenSSL 1.1' 1>/dev/null || (echo "error: please install OpenSSL v1.1.*" && exit 1)
+[ -z "${CRYPTO_KEY}" ] && echo error: CRYPTO_KEY is unset && exit 1
+CIPHER=${CIPHER:-aes-256-cbc}
+CIPHER_ARGS=${CIPHER_ARGS:--pbkdf2}
+
+# set -x
+set -e
+CMD="$1"
+shift 1
+
+decrypt() { printf "$@" | openssl ${CIPHER} ${CIPHER_ARGS} -k ${CRYPTO_KEY} -d -A -a; }
+encrypt() { printf "$@" | openssl ${CIPHER} ${CIPHER_ARGS} -k ${CRYPTO_KEY} -e -A -a; }
+encrypt_wrap() { printf "$@" | openssl ${CIPHER} ${CIPHER_ARGS} -k ${CRYPTO_KEY} -e -a; }
+
+case $CMD in
+  decrypt-env)
+    ENVFILE="$1"
+    shift 1
+    touch ${ENVFILE}
+    for env in $@; do
+      enc=$(env | grep ^$env=)
+      enc=${enc#"$env"=}
+      echo decrypting $env=$enc
+      dec=$(decrypt "$enc")
+      # TODO think about if $dec has a double quote inside of it -> escape it?
+      printf "export ${env}=\"${dec}\"\n" >> ${ENVFILE}
+    done
+    ;;
+  decrypt)
+    decrypt "$@"
+    ;;
+  encrypt)
+    encrypt "$@"
+    ;;
+  encrypt-wrap)
+    encrypt_wrap "$@"
+    ;;
+  *)
+    echo unimplemented: $CMD
+    exit 1
+    ;;
+esac

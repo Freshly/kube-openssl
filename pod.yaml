@@ -1,0 +1,58 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: openssl
+  annotations:
+    sidecar.istio.io/inject: "false"
+spec:
+  containers:
+  - name: sleeper
+    image: gcr.io/freshly-docker/crypto:0.0.6
+    command:
+    - /bin/sh
+    args:
+    - -c
+    # if source command isn't available, use this:
+    # [ ! -f /env/decrypted ] || . /env/decrypted &&
+    - >-
+      printf "From file:\n" &&
+      cat /env/decrypted &&
+      [ ! -f /env/decrypted ] || source /env/decrypted &&
+      printf "\n\nFrom environment:\n" &&
+      env | grep -E 'FOO|ORLY|WTF_IS_THIS|ZZZ_MULTILINE' &&
+      printf "ZZZ_MULTILINE=${ZZZ_MULTILINE}\n" &&
+      sleep 99999
+    volumeMounts:
+    - name: secrets
+      mountPath: /env
+  initContainers:
+  - name: decrypt
+    image: gcr.io/freshly-docker/crypto:0.0.6
+    args:
+    - decrypt-env
+    - /env/decrypted
+    - FOO
+    - ORLY
+    - WTF_IS_THIS
+    - ZZZ_MULTILINE
+    env:
+    - name: CRYPTO_KEY
+      valueFrom:
+        secretKeyRef:
+          name: master-key
+          key: key
+          optional: false
+    - name: FOO
+      value: U2FsdGVkX1+G+mNTonDg4M7eUDn5ZdxaXJXVbeNsvXA=
+    - name: ORLY
+      value: U2FsdGVkX1+x9X8RPqt//RGi+EhFbwViHYL1vwMkScOfxsXVgxnJ7Vw5U+/6zNW+
+    - name: WTF_IS_THIS
+      value: U2FsdGVkX191GTsP0kw7ONiPs4+gqt4jJjd55Zv7YZY=
+    - name: ZZZ_MULTILINE
+      value: U2FsdGVkX188XrwVYit29AHB28+5Frj6glh8WpkiHL5568mYpoJTYuaB/LA9gsDF9QPMspzX80mYGF6zfjTRa6uYfortndn6vh5WtkQHTws=
+    volumeMounts:
+    - name: secrets
+      mountPath: /env
+  volumes:
+  - name: secrets
+    emptyDir: {}
