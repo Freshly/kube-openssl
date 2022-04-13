@@ -21,7 +21,7 @@ make_credential_file() {
 	values=($(echo $secrets | jq -r '.data | to_entries[].value' 2>/dev/null))
 
 	log "there are ${#keys[@]} keys and ${#values[@]} values"
-	[ ${#keys[@]} -ne ${#values[@]} ] && log "key/value count mismatch!" && return
+	[ ${#keys[@]} -ne ${#values[@]} ] && log "ERROR key/value count mismatch!" && return
 
 	log "sorting and deduplicating"
 	keys2=() values2=()
@@ -38,7 +38,7 @@ make_credential_file() {
 	keys=(${keys2[@]}) values=(${values2[@]})
 
 	log "there are ${#keys[@]} keys and ${#values[@]} values (deduplicated)"
-	[ ${#keys[@]} -ne ${#values[@]} ] && log "key/value count mismatch!" && return
+	[ ${#keys[@]} -ne ${#values[@]} ] && log "ERROR key/value count mismatch!" && return
 
 	log "base64 decoding values"
 	for (( i=0; i<${#values[@]}; i++ )); do
@@ -52,6 +52,7 @@ make_credential_file() {
 		for (( i=0; i<${#keys[@]}; i++ )); do
 			key=${keys[$i]} value="${values[$i]}"
 			 if [[ $key =~ _BASIC_AUTH_USERNAME$ ]] ||  [[ $key =~ _BASIC_AUTH_PASSWORD$ ]]; then
+			 	printf "$key $value\n" >> "${DIR}/credentials.raw.$1"
 			 	[[ $count -gt 0 ]] && printf ",\n"; count=$(($count+1))
 			 	printf "\t{\n"
 			 	printf "\t\t'username': '$key',\n"
@@ -61,10 +62,11 @@ make_credential_file() {
 		done
 		printf "\n]"
 	}
-	ruby_grpc_json > "${DIR}/credentials.json.$1"
+	rm -f "${DIR}/credentials.raw.$1"
+	ruby_grpc_json $1 > "${DIR}/credentials.json.$1"
 }
 
-# make_credential_file staging
+make_credential_file staging
 make_credential_file prod
 
 log done
