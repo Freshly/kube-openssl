@@ -22,7 +22,7 @@ make_credential_file() {
 	values=($(echo $secrets | jq -r '.data | to_entries[].value' 2>/dev/null))
 	log "there are ${#keys[@]} keys and ${#values[@]} values"
 
-	[ ${#keys[@]} -ne ${#values[@]} ] && log "key/value count mismatch!" && exit 1
+	[ ${#keys[@]} -ne ${#values[@]} ] && log "key/value count mismatch!" && return
 
 	log "base64 decoding values"
 	for (( i=0; i<${#values[@]}; i++ )); do
@@ -48,7 +48,7 @@ make_credential_file() {
 	ruby_grpc_json > "${DIR}/credentials.json.$1"
 }
 
-# make_credential_file staging
+make_credential_file staging
 make_credential_file prod
 
 log done
