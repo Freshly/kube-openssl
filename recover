@@ -17,11 +17,27 @@ make_credential_file() {
 	count=$(echo $secrets | jq -s '. | length')
 	log "reduced to $count secrets with -env in the name"
 
-	log "parsing keys/values"
 	keys=($(echo $secrets | jq -r '.data | to_entries[].key' 2>/dev/null))
 	values=($(echo $secrets | jq -r '.data | to_entries[].value' 2>/dev/null))
-	log "there are ${#keys[@]} keys and ${#values[@]} values"
 
+	log "there are ${#keys[@]} keys and ${#values[@]} values"
+	[ ${#keys[@]} -ne ${#values[@]} ] && log "key/value count mismatch!" && return
+
+	log "sorting and deduplicating"
+	keys2=() values2=()
+	mkfifo mypipe
+	for (( i=1; i<${#keys[@]}; i++ )); do
+		key=${keys[$i]} value=${values[$i]}
+		printf "$key $value\n"
+	done | sort -u > mypipe &
+	while read kv; do
+		key=$(printf "$kv" | awk '{print $1}')
+		value=$(printf "$kv" | awk '{print $2}')
+		keys2+=($key) values2+=($value)
+	done < mypipe && rm mypipe
+	keys=(${keys2[@]}) values=(${values2[@]})
+
+	log "there are ${#keys[@]} keys and ${#values[@]} values (deduplicated)"
 	[ ${#keys[@]} -ne ${#values[@]} ] && log "key/value count mismatch!" && return
 
 	log "base64 decoding values"
@@ -48,7 +64,7 @@ make_credential_file() {
 	ruby_grpc_json > "${DIR}/credentials.json.$1"
 }
 
-make_credential_file staging
+# make_credential_file staging
 make_credential_file prod
 
 log done
